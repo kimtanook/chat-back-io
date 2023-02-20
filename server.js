@@ -10,21 +10,44 @@ const io = require("socket.io")(http, {
   },
 });
 
+const chatRooms = () => {
+  const {
+    sockets: {
+      adapter: { sids, rooms },
+    },
+  } = io;
+  const publicRooms = [];
+  rooms.forEach((_, key) => {
+    if (sids.get(key) === undefined) {
+      publicRooms.push({ room: key });
+    }
+  });
+
+  return publicRooms;
+};
+
 io.on("connection", (socket) => {
-  socket.on("room_enter", (roomName, nickname, showRoom) => {
-    socket.join(roomName);
-    // 프론트에서 받은 아래 함수는 백에서 실행시키지 않고, 프론트의 실행 버튼을 대신 눌러준다고 생각하면 편하다.
-    showRoom();
-    socket.to(roomName).emit("welcome", nickname);
+  io.sockets.emit("roomChange", chatRooms());
+  socket.on("enterRoom", (room, user, id, toggleHandler) => {
+    socket.join(room);
+    toggleHandler();
+    socket.to(room).emit("enter", user);
+    io.sockets.emit("roomChange", chatRooms());
     socket.on("disconnecting", () => {
-      socket.to(roomName).emit("bye", nickname);
+      socket.to(room).emit("exit", user);
+    });
+    socket.on("disconnect", () => {
+      io.sockets.emit("roomChange", chatRooms());
     });
   });
-  socket.on("message", (roomName, nickname, message) => {
-    socket.to(roomName).emit("message", nickname, message);
+  socket.on("message", (message) => {
+    socket.to(message.room).emit("message", message);
+  });
+  socket.on("whisperMessage", (whisperId, whisperMessage) => {
+    socket.to(whisperId).emit("message", whisperMessage);
   });
 });
 
 http.listen(3000, () => {
-  console.log("서버가 요청을 받을 준비가 됐어요");
+  console.log("서버 열림");
 });
