@@ -55,6 +55,7 @@ const countRoomUser = (room) => {
   return count;
 };
 io.on("connection", (socket) => {
+  console.log("Connect!!");
   io.sockets.emit("roomChange", chatRooms());
   socket.on("enterRoom", (room, user, id, toggleHandler) => {
     socket["nickname"] = user;
